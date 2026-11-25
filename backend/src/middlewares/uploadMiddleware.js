@@ -1,4 +1,5 @@
 import multer from 'multer';
+import { randomUUID } from 'node:crypto';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -23,10 +24,7 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     // Create unique filename: timestamp_originalname
-    const uniqueSuffix = Date.now() + '_' + Math.round(Math.random() * 1E9);
-    const extension = path.extname(file.originalname);
-    const basename = path.basename(file.originalname, extension);
-    cb(null, `${basename}_${uniqueSuffix}${extension}`);
+    cb(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`);
   }
 });
 
@@ -64,7 +62,10 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 100 * 1024 * 1024, // 100MB limit
+    fileSize: 25_000_000,
+    files: 1,
+    fields: 0,
+    parts: 1
   }
 });
 
@@ -81,7 +82,7 @@ export const uploadMiddleware = (req, res, next) => {
       if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(413).json({
           error: 'File too large',
-          details: `File size exceeds 100MB limit. Received: ${(err.limit / 1024 / 1024).toFixed(2)}MB`,
+          details: 'File size exceeds 25 MB limit',
           status: 413,
           timestamp: new Date().toISOString()
         });
