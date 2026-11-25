@@ -6,6 +6,8 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  updateProfile as firebaseUpdateProfile,
+  sendEmailVerification,
 } from "firebase/auth";
 
 const firebaseConfig = {
@@ -26,6 +28,7 @@ const LOCAL_KEY = "smng_user";
 export const signupWithEmail = async (email, password) => {
   const userCred = await createUserWithEmailAndPassword(auth, email, password);
   const user = userCred.user;
+  await sendEmailVerification(user);
   const payload = { uid: user.uid, email: user.email };
   localStorage.setItem(LOCAL_KEY, JSON.stringify(payload));
   return user;
@@ -67,7 +70,7 @@ export const getLocalUser = () => {
 // update profile:
 export const updateProfile = async (updates) => {
   if (!auth.currentUser) throw new Error("No user is currently logged in.");
-  await auth.currentUser.updateProfile(updates);
+  await firebaseUpdateProfile(auth.currentUser, updates);
 };
 
 export default auth;
