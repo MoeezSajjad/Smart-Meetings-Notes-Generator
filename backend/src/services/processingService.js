@@ -1,3 +1,4 @@
+import { deleteUploadedFile } from '../middlewares/uploadMiddleware.js';
 import { transcribeAudio } from './whisperService.js';
 import { generateNotesFromTranscript } from './notesService.js';
 import { storeMeeting, updateMeetingStatus, storeTranscript, storeNotes } from './storageService.js';
@@ -47,17 +48,18 @@ export const processAudioFile = async (meetingId, audioFilePath, metadata = {}) 
       notes,
     };
   } catch (error) {
-    console.error(`[Processing] ❌ Failed to process meeting ${meetingId}:`, error);
+    console.error(`[Processing] Failed to process meeting ${meetingId}`);
     
     // Update status to error
     updateMeetingStatus(meetingId, 'error');
     
     // Store error details
     storeMeeting(meetingId, {
-      error: error.message,
-      errorStack: error.stack,
+      error: 'Processing failed',
     });
 
-    throw error;
+    throw new Error('Processing failed');
+  } finally {
+    deleteUploadedFile(audioFilePath);
   }
 };
