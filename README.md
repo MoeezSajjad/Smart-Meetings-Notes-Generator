@@ -21,11 +21,11 @@ Each folder has its own README and docs with more detail — see `backend/README
 ### 1. Clone and install
 
 ```bash
-git clone <your-repo-url>
-cd <repo-name>
+git clone https://github.com/MoeezSajjad/Smart-Meetings-Notes-Generator.git
+cd Smart-Meetings-Notes-Generator
 
-cd backend && npm install
-cd ../frontend && npm install
+cd backend && npm ci
+cd ../frontend && npm ci
 ```
 
 ### 2. Set up environment variables
@@ -58,3 +58,6 @@ The frontend runs at `http://localhost:3000`, the backend at `http://localhost:5
 
 - `backend/uploads/` is where incoming audio files land during processing. It's git-ignored except for a `.gitkeep` placeholder, so test recordings don't bloat the repo.
 - Firebase's client-side config is meant to be public by design (it's not a secret the way an API key normally is), but it's still pulled from environment variables here rather than hardcoded, to keep config in one place and out of source control.
+
+## Restricted demo deployment
+Use Node 22+, configure Firebase Email/Password authentication, and use the same Firebase project on the frontend and backend. Set backend FIREBASE_API_KEY, FIREBASE_PROJECT_ID, GROQ_API_KEY, NODE_ENV=production, CORS_ORIGIN and DEMO_ALLOWED_EMAILS. Verify demo accounts before use. Build frontend with npm run build and serve dist with SPA fallback. Set VITE_API_URL to the backend HTTPS URL before building. Do not publish a live demo until dependency audits and integration tests pass. In-memory data is lost on restart; browser copies are not deleted by server expiry. Use synthetic audio only. See backend/README.md for details.
