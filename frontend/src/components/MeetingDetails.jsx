@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Download, Copy, Clock, Calendar, Loader, AlertCircle, CheckCircle } from 'lucide-react';
-import { getLocalUser } from '../firebase';
+import auth, { getLocalUser } from '../firebase';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -29,11 +29,11 @@ const MeetingDetails = () => {
     console.log('[MeetingDetails] Loading meeting:', meetingId);
 
     try {
-      const meetings = JSON.parse(localStorage.getItem('userMeetings') || '[]');
+      const meetings = JSON.parse(localStorage.getItem(`userMeetings:${user.uid}`) || '[]');
       const found = meetings.find(m => m.meetingId === meetingId);
       
       if (found) {
-        console.log('[MeetingDetails] Meeting found:', found);
+        console.log('[MeetingDetails] Meeting found');
         setMeeting(found);
       } else {
         console.log('[MeetingDetails] Meeting not found');
@@ -81,7 +81,7 @@ const MeetingDetails = () => {
 
       try {
         console.log('[MeetingDetails] Fetching status...');
-        const response = await fetch(`${API_BASE}/api/audio/status/${meetingId}`);
+        const response = await fetch(`${API_BASE}/api/audio/status/${meetingId}`, { headers: { Authorization: `Bearer ${await auth.currentUser?.getIdToken()}` } });
         
         if (!response.ok) {
           console.error('[MeetingDetails] Status check failed:', response.status);
@@ -89,7 +89,7 @@ const MeetingDetails = () => {
         }
         
         const data = await response.json();
-        console.log('[MeetingDetails] Status received:', data);
+        console.log('[MeetingDetails] Status received:', data.status);
 
         if (!mountedRef.current) return;
 
@@ -107,7 +107,7 @@ const MeetingDetails = () => {
 
         // Update localStorage
         try {
-          const meetings = JSON.parse(localStorage.getItem('userMeetings') || '[]');
+          const meetings = JSON.parse(localStorage.getItem(`userMeetings:${user.uid}`) || '[]');
           const meetingIndex = meetings.findIndex(m => m.meetingId === meetingId);
           if (meetingIndex !== -1) {
             meetings[meetingIndex] = { 
@@ -117,7 +117,7 @@ const MeetingDetails = () => {
               notes: data.data?.notes || meetings[meetingIndex].notes,
               error: data.data?.error || meetings[meetingIndex].error,
             };
-            localStorage.setItem('userMeetings', JSON.stringify(meetings));
+            localStorage.setItem(`userMeetings:${user.uid}`, JSON.stringify(meetings));
             console.log('[MeetingDetails] LocalStorage updated');
           }
         } catch (err) {
