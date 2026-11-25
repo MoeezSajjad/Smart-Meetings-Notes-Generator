@@ -22,7 +22,7 @@ const Dashboard = () => {
     try {
       setLoading(true);
       // Fetch meetings from backend - would store meetingIds in localStorage or DB
-      const storedMeetings = JSON.parse(localStorage.getItem('userMeetings') || '[]');
+      const storedMeetings = JSON.parse(localStorage.getItem(`userMeetings:${user.uid}`) || '[]');
       setMeetings(storedMeetings);
     } catch (error) {
       console.error('Failed to fetch meetings:', error);
@@ -36,7 +36,7 @@ const Dashboard = () => {
       try {
         const updated = meetings.filter(m => m.meetingId !== meetingId);
         setMeetings(updated);
-        localStorage.setItem('userMeetings', JSON.stringify(updated));
+        localStorage.setItem(`userMeetings:${user.uid}`, JSON.stringify(updated));
       } catch (error) {
         console.error('Failed to delete meeting:', error);
       }
