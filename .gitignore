@@ -33,3 +33,7 @@ Thumbs.db
 # Editor
 .vscode/*
 !.vscode/settings.json
+
+# All environment files except checked-in templates
+.env.*
+!.env.example
