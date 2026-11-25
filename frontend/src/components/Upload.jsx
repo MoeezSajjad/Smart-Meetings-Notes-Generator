@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Upload, ArrowLeft, FileAudio, Loader, CheckCircle, AlertCircle } from 'lucide-react';
-import { getLocalUser } from '../firebase';
+import auth, { getLocalUser } from '../firebase';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -41,10 +41,10 @@ const UploadPage = () => {
         return;
       }
 
-      // Validate file size (100MB)
-      const maxSize = 100 * 1024 * 1024;
+      // Validate file size (25 MB)
+      const maxSize = 25_000_000;
       if (selectedFile.size > maxSize) {
-        setError('File size exceeds 100MB limit.');
+        setError('File size exceeds 25 MB limit.');
         setFile(null);
         return;
       }
@@ -72,6 +72,7 @@ const UploadPage = () => {
 
       const response = await fetch(`${API_BASE}/api/audio/upload`, {
         method: 'POST',
+        headers: { Authorization: `Bearer ${await auth.currentUser?.getIdToken()}` },
         body: formData,
       });
 
@@ -91,15 +92,14 @@ const UploadPage = () => {
         fileName: data.data.originalFileName,
         fileSize: data.data.fileSize,
         uploadedAt: data.data.uploadedAt,
-        serverPath: data.data.serverPath,
         status: 'uploaded',
         transcript: null,
         notes: null,
       };
 
-      const existingMeetings = JSON.parse(localStorage.getItem('userMeetings') || '[]');
+      const existingMeetings = JSON.parse(localStorage.getItem(`userMeetings:${user.uid}`) || '[]');
       existingMeetings.unshift(newMeeting);
-      localStorage.setItem('userMeetings', JSON.stringify(existingMeetings));
+      localStorage.setItem(`userMeetings:${user.uid}`, JSON.stringify(existingMeetings));
 
       setMeetingId(data.data.meetingId);
       setUploadStatus('success');
@@ -217,7 +217,7 @@ const UploadPage = () => {
                       Drop your file here or click to browse
                     </p>
                     <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                      Supported formats: MP3, WAV, M4A (Max 100MB)
+                      Supported formats: MP3, WAV, M4A (Max 25 MB)
                     </p>
                   </div>
                 </div>
@@ -304,7 +304,7 @@ const UploadPage = () => {
               <h3 className="font-semibold text-blue-900 dark:text-blue-400 mb-3">Requirements:</h3>
               <ul className="space-y-2 text-sm text-blue-800 dark:text-blue-500">
                 <li>✓ Audio formats: MP3, WAV, M4A</li>
-                <li>✓ File size: Up to 100MB</li>
+                <li>✓ File size: Up to 25 MB</li>
                 <li>✓ Clear audio for best transcription accuracy</li>
                 <li>✓ Meeting duration: Recommended up to 2 hours</li>
               </ul>
