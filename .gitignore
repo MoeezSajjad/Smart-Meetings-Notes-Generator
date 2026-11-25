@@ -37,3 +37,12 @@ Thumbs.db
 # All environment files except checked-in templates
 .env.*
 !.env.example
+# Local provider credentials and recordings
+*.pem
+*.p12
+*.pfx
+*service-account*.json
+*firebase-adminsdk*.json
+*.wav
+*.mp3
+*.m4a
