@@ -4,6 +4,14 @@
  */
 
 const meetings = new Map();
+// Demo-only retention: keep active work; expire completed records after one hour.
+const timer = setInterval(() => {
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  for (const [id, meeting] of meetings) {
+    if (['ready', 'error'].includes(meeting.status) && Date.parse(meeting.updatedAt) < cutoff) meetings.delete(id);
+  }
+}, 60_000);
+timer.unref();
 
 /**
  * Store meeting data
@@ -13,7 +21,7 @@ const meetings = new Map();
 export const storeMeeting = (meetingId, data) => {
   const existing = meetings.get(meetingId) || {};
   meetings.set(meetingId, { ...existing, ...data, updatedAt: new Date().toISOString() });
-  console.log(`[Storage] Meeting ${meetingId} stored:`, { ...existing, ...data });
+  console.log(`[Storage] Meeting ${meetingId} stored`);
 };
 
 /**
