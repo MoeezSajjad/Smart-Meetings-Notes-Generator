@@ -3,16 +3,19 @@ import express from 'express';
 import { uploadAudio, getUploadStatus, processAudio, generateNotes } from '../controllers/audioController.js';
 import { uploadMiddleware } from '../middlewares/uploadMiddleware.js';
 
+import { requireUser, limitUploads } from '../middlewares/requireUser.js';
+
 const router = express.Router();
+router.use(requireUser);
 
 /**
  * POST /api/audio/upload
  * Upload audio file for meeting transcription
  * Requires: multipart/form-data with 'audio' field
  * Supported formats: .wav, .mp3, .m4a
- * Max size: 100MB
+ * Max size: 25 MB
  */
-router.post('/upload', uploadMiddleware, uploadAudio);
+router.post('/upload', limitUploads, uploadMiddleware, uploadAudio);
 
 /**
  * GET /api/audio/status/:meetingId
