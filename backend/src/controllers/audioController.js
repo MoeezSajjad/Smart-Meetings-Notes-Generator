@@ -9,7 +9,7 @@ import { storeMeeting, getMeeting } from '../services/storageService.js';
  * 
  * Expected multipart/form-data with 'audio' field
  * Supported formats: wav, mp3, m4a
- * Max file size: 100MB
+ * Max file size: 25 MB
  */
 export const uploadAudio = (req, res) => {
   try {
@@ -35,12 +35,12 @@ export const uploadAudio = (req, res) => {
     // Store initial meeting data
     storeMeeting(meetingId, {
       meetingId,
+      ownerUid: req.user.uid,
       originalFileName,
       fileExtension,
       fileSize,
       mimeType,
       uploadedAt: new Date().toISOString(),
-      serverPath: audioFilePath,
       status: 'uploaded',
     });
 
@@ -66,7 +66,6 @@ export const uploadAudio = (req, res) => {
         fileSize: fileSize,
         mimeType: mimeType,
         uploadedAt: new Date().toISOString(),
-        serverPath: audioFilePath,
         status: 'uploaded', // Will change to 'processing' then 'ready'
       },
       timestamp: new Date().toISOString()
@@ -76,7 +75,6 @@ export const uploadAudio = (req, res) => {
     console.error('Upload error:', error);
     res.status(500).json({
       error: 'Failed to upload audio file',
-      details: error.message,
       status: 500,
       timestamp: new Date().toISOString()
     });
@@ -94,7 +92,7 @@ export const getUploadStatus = (req, res) => {
     // Get meeting from storage
     const meeting = getMeeting(meetingId);
 
-    if (!meeting) {
+    if (!meeting || meeting.ownerUid !== req.user.uid) {
       return res.status(404).json({
         error: 'Meeting not found',
         meetingId: meetingId,
@@ -111,14 +109,13 @@ export const getUploadStatus = (req, res) => {
       data: {
         transcript: meeting.transcript || null,
         notes: meeting.notes || null,
-        error: meeting.error || null,
+        error: meeting.status === 'error' ? 'Processing failed. Please try again.' : null,
       },
       timestamp: new Date().toISOString()
     });
   } catch (error) {
     res.status(500).json({
       error: 'Failed to get status',
-      details: error.message,
       status: 500,
       timestamp: new Date().toISOString()
     });
