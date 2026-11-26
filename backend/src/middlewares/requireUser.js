@@ -20,9 +20,9 @@ export async function verifyFirebaseToken(token, project, keySet = keys) {
     typeof payload.sub !== "string" ||
     !payload.sub ||
     payload.sub.length > 128 ||
-    payload.iat > now ||
+    payload.iat > now + 10 ||
     typeof payload.auth_time !== "number" ||
-    payload.auth_time > now
+    payload.auth_time > now + 10
   ) {
     throw new Error("Invalid identity");
   }
