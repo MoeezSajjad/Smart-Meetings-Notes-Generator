@@ -38,6 +38,10 @@ Cloudflare Free currently permits 500 builds per month with a 20-minute build ti
 
 [Railway monorepo settings](https://docs.railway.com/deployments/monorepo) · [Health checks](https://docs.railway.com/deployments/healthchecks) · [Groq speech upload limits](https://console.groq.com/docs/speech-to-text) · [Groq models](https://console.groq.com/docs/models).
 
+## Current public frontend
+
+The [GitHub Pages demo](https://moeezsajjad.github.io/Smart-Meetings-Notes-Generator/#/sample) is deployed from the gh-pages branch of this public repository. Its production client uses hash routing, relative assets, the Firebase web configuration and the Railway HTTPS origin. Open the sample without signing in. To publish an update, build the frontend with VITE_ROUTER_MODE set to hash and the public variables from frontend/.env.example, commit dist contents to gh-pages, then verify the site on HTTPS.
+
 ## Current hosted backend
 
 The Railway project is **smart-meetings-demo**, service **api**, environment **production**. Its assigned origin is [api-production-14144ac0.up.railway.app](https://api-production-14144ac0.up.railway.app/api/health). The initial Docker build succeeded on Node.js 22.23.5. Activation requires setting the Groq runtime secret and obtaining HTTP 200 from the health endpoint. The CLI verified a 30-day trial with no payment method and a zero current bill on 26 November 2026. Select Free when the trial ends to continue within the monthly free allowance.

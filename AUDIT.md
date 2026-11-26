@@ -38,10 +38,14 @@ Firebase web configuration identifies a client project and is distributed to bro
 | Backend npm security audit | Passed | Zero reported advisories after lockfile remediation. |
 | Groq model availability | Passed live | Both model IDs returned by the authenticated models endpoint. |
 | Live transcription and notes | Passed live, local API | Synthesized a fictional support handover on Windows. A real Firebase user uploaded it (201), the second user received 404, polling reached ready and Groq returned a transcript, summary and two action items. Both temporary accounts were deleted. |
-| Hosted live API and end-to-end HTTPS communication | Pending | Railway CLI reported Unauthorized. Sign-in, verified live allowlist and host configuration required. Docker CLI was unavailable locally. |
+| Public frontend | Passed live | Opened the fictional sample at its public HTTPS URL in Chrome, switched to the transcript and downloaded the notes. |
+| Frontend tests and dependency audit | Passed | Three frontend tests passed. The production Vite build completed and npm reported zero known advisories. |
+| Hosted API | Awaiting runtime credential | Railway login succeeded and the Node 22 Docker image built remotely. The service has an HTTPS domain and a production allowlist. The first health check returned 502 while the required Groq secret was missing. |
 
 Run `npm ci && npm test && npm audit` inside backend. The API regression suite needs no real credentials. For a live functional test, sign in with a verified allowlisted Firebase account, upload a short synthetic recording that explicitly states one action item, wait for ready, inspect the transcript and download the notes. The [deployment guide](DEPLOYMENT.md) includes exact host settings and expected responses.
 
 ## Residual operating limits
 
 The app sends recording content to Groq. Use synthetic audio for public demonstrations. Data disappears on restart. Multiple instances would have independent stores and quotas; deploy one instance. Long or noisy recordings can fail even within the byte limit; a transcript above 100,000 characters is rejected. Container signatures are a basic format check, and provider availability, free quotas, model behavior and cold starts are external dependencies.
+
+The hosted sample also passed Chrome layout checks at 320, 390, 768 and 1440 CSS pixels. Summary, transcript, key points and action items opened at each width with no horizontal overflow. The screenshots in docs/ contain fictional sample content. The GitHub Actions push and pull request checks passed for the reviewed application code.

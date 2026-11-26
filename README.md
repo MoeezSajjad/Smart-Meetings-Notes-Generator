@@ -40,3 +40,7 @@ Open the URL printed by Vite. The sample needs no account or API keys. For live 
 - [Free deployment and troubleshooting](DEPLOYMENT.md)
 
 The API is a single-instance demo. It keeps meeting results in memory for approximately one hour and loses them on restart. Download the notes before they expire. A pending upload can be interrupted by a host restart or quota limit. Accuracy depends on the audio and model. Review generated text before using it.
+
+## Screenshots
+
+[Desktop sample](docs/sample-desktop.png) · [Mobile sample](docs/sample-mobile.png)
