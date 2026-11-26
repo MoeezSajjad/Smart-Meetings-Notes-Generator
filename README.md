@@ -1,63 +1,42 @@
-# Smart Meeting Notes Generator
+# Smart Meetings Notes Generator
 
-AI-based meeting audio transcription and summarization. Upload a meeting recording and get back a transcript, a concise summary, key points, and action items.
+Turn a short meeting recording into a transcript, summary and follow-up list. This final-year portfolio project combines a React interface with an authenticated Node.js API. The public example uses fictional meeting content and works independently of the live processing service.
 
-- **Frontend:** React (Vite) + Tailwind CSS, Firebase Authentication
-- **Backend:** Node.js + Express, Multer for uploads
-- **AI:** Groq Whisper for transcription, a Groq language model for structured note generation
+## Try it
 
-## Project Structure
+[Open the public sample meeting](https://moeezsajjad.github.io/Smart-Meetings-Notes-Generator/#/sample). Read the discussion, review the decisions and action items, and download the notes. Live uploads are a separate, restricted feature. Use a short synthetic recording for demonstrations.
 
-```
-.
-├── backend/     Node.js + Express API (transcription, note generation, auth checks)
-└── frontend/    React + Vite web app (upload, dashboard, meeting details)
-```
+## How it works
 
-Each folder has its own README and docs with more detail — see `backend/README.md` and `frontend/README_COMPLETE.md`.
-
-## Getting Started
-
-### 1. Clone and install
-
-```bash
-git clone https://github.com/MoeezSajjad/Smart-Meetings-Notes-Generator.git
-cd Smart-Meetings-Notes-Generator
-
-cd backend && npm ci
-cd ../frontend && npm ci
+```mermaid
+flowchart LR
+  S[Public sample] --> UI[React + Vite]
+  UI -->|Sign in| F[Firebase Authentication]
+  UI -->|Audio + Firebase ID token| API[Express API]
+  API -->|Verify signature| K[Google public signing keys]
+  API -->|Temporary audio| W[Groq Whisper]
+  W -->|Transcript| N[Groq notes model]
+  N -->|Validated notes| M[Owner-scoped memory store]
+  M -->|Authenticated polling| UI
 ```
 
-### 2. Set up environment variables
+## Run on Windows
 
-Both apps need a local `.env` file (never committed — see `.gitignore`).
+Install Node.js 22 LTS and npm. In a terminal at the repository root:
 
-**backend/.env** — copy `backend/.env.example` and fill in:
-- `GROQ_API_KEY` — from [console.groq.com](https://console.groq.com)
-- `PORT`, `CORS_ORIGIN`, and the rest as documented in `backend/.env.example`
-
-**frontend/.env** — copy `frontend/.env.example` and fill in your Firebase project's config (Firebase Console → Project Settings):
-- `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, etc.
-- `VITE_API_URL` — the backend URL (`http://localhost:5000` by default)
-
-### 3. Run it
-
-```bash
-# Terminal 1
-cd backend
-npm run dev
-
-# Terminal 2
+```powershell
 cd frontend
+npm ci
 npm run dev
 ```
 
-The frontend runs at `http://localhost:3000`, the backend at `http://localhost:5000`.
+Open the URL printed by Vite. The sample needs no account or API keys. For live uploads also follow the [API setup](backend/README.md), then configure the browser using the [frontend guide](frontend/README.md). Restart Vite when changing environment variables.
 
-## Notes
+## Documentation
 
-- `backend/uploads/` is where incoming audio files land during processing. It's git-ignored except for a `.gitkeep` placeholder, so test recordings don't bloat the repo.
-- Firebase's client-side config is meant to be public by design (it's not a secret the way an API key normally is), but it's still pulled from environment variables here rather than hardcoded, to keep config in one place and out of source control.
+- [Frontend and recruiter walkthrough](frontend/README.md)
+- [Backend setup, environment and endpoint reference](backend/README.md)
+- [Security audit, test evidence and limitations](AUDIT.md)
+- [Free deployment and troubleshooting](DEPLOYMENT.md)
 
-## Restricted demo deployment
-Use Node 22+, configure Firebase Email/Password authentication, and use the same Firebase project on the frontend and backend. Set backend FIREBASE_API_KEY, FIREBASE_PROJECT_ID, GROQ_API_KEY, NODE_ENV=production, CORS_ORIGIN and DEMO_ALLOWED_EMAILS. Verify demo accounts before use. Build frontend with npm run build and serve dist with SPA fallback. Set VITE_API_URL to the backend HTTPS URL before building. Do not publish a live demo until dependency audits and integration tests pass. In-memory data is lost on restart; browser copies are not deleted by server expiry. Use synthetic audio only. See backend/README.md for details.
+The API is a single-instance demo. It keeps meeting results in memory for approximately one hour and loses them on restart. Download the notes before they expire. A pending upload can be interrupted by a host restart or quota limit. Accuracy depends on the audio and model. Review generated text before using it.
