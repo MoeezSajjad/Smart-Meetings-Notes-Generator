@@ -1,52 +1,106 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { loginWithEmail } from '../firebase';
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { getClient, authMessage } from "../firebase";
+import { useSession } from "../lib/Session";
 
-const Login = () => {
-  const [form, setForm] = useState({ email: '', password: '' });
-
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-
+export default function AuthForm({ signup = false }) {
+  const { unavailable, user, loading } = useSession();
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  async function submit(event) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setBusy(true);
+    setError("");
     try {
-      await loginWithEmail(form.email, form.password);
-      navigate('/');
-    } catch (err) {
-      window.alert(err.message || 'Login failed');
+      const { auth, sdk } = await getClient();
+      if (signup) {
+        const credential = await sdk.createUserWithEmailAndPassword(
+          auth,
+          form.get("email"),
+          form.get("password"),
+        );
+        if (form.get("name")?.trim())
+          await sdk.updateProfile(credential.user, {
+            displayName: form.get("name").trim(),
+          });
+        await sdk.sendEmailVerification(credential.user);
+        navigate("/profile", { replace: true, state: { sent: true } });
+      } else {
+        await sdk.signInWithEmailAndPassword(
+          auth,
+          form.get("email"),
+          form.get("password"),
+        );
+        navigate("/dashboard", { replace: true });
+      }
+    } catch (e) {
+      setError(authMessage(e.code));
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
-  };
-
+  }
+  const title = signup ? "Create an account" : "Sign in";
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 p-6">
-      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-xl shadow-lg p-8 border border-slate-200 dark:border-slate-800">
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Welcome back</h2>
-        <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">Log in to access your meeting summaries and dashboard.</p>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email</label>
-            <input name="email" type="email" value={form.email} onChange={handleChange} required className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Password</label>
-            <input name="password" type="password" value={form.password} onChange={handleChange} required className="w-full px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" />
-          </div>
-
-          <button type="submit" className="w-full inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold">Sign in</button>
-        </form>
-
-        <p className="text-sm text-slate-600 dark:text-slate-400 mt-4">Need an account? <Link to="/signup" className="text-blue-600 hover:underline">Create one</Link></p>
-      </div>
-    </div>
+    <section className="sheet">
+      <span className="label">Private workspace</span>
+      <h1>{title}</h1>
+      {loading ? (
+        <p role="status">Checking session…</p>
+      ) : unavailable ? (
+        <>
+          <p>
+            Live sign-in is unavailable on this deployment. The sample includes
+            the transcript, notes and download.
+          </p>
+          <Link className="primary" to="/sample">
+            Explore sample meeting
+          </Link>
+        </>
+      ) : (
+        <>
+          {user && !busy && (
+            <p>
+              Signed in as {user.email}.{" "}
+              <Link to="/profile">Manage account</Link>
+            </p>
+          )}
+          <p>
+            Live uploads require a verified, approved account. Anyone can{" "}
+            <Link to="/sample">explore the sample meeting</Link>.
+          </p>
+          <form onSubmit={submit}>
+            {signup && (
+              <label>
+                Name (optional)
+                <input name="name" maxLength={80} autoComplete="name" />
+              </label>
+            )}
+            <label>
+              Email
+              <input name="email" required type="email" autoComplete="email" />
+            </label>
+            <label>
+              Password
+              <input
+                name="password"
+                required
+                type="password"
+                minLength={signup ? 6 : undefined}
+                autoComplete={signup ? "new-password" : "current-password"}
+              />
+            </label>
+            {error && <p role="alert">{error}</p>}
+            <button className="primary" disabled={busy}>
+              {busy ? "Please wait…" : title}
+            </button>
+          </form>
+          <Link to={signup ? "/login" : "/signup"}>
+            {signup ? "Already have an account? Sign in" : "Create an account"}
+          </Link>
+        </>
+      )}
+    </section>
   );
-};
-
-export default Login;
+}

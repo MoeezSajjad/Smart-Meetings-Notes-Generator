@@ -1,76 +1,60 @@
-// Firebase initialization and auth helper
-import { initializeApp } from "firebase/app";
-import {
-  getAuth,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-  updateProfile as firebaseUpdateProfile,
-  sendEmailVerification,
-} from "firebase/auth";
-
-const firebaseConfig = {
+const config = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+export const apiBase = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
+export const configured =
+  Object.values(config).every(Boolean) &&
+  (/^https:\/\//.test(apiBase) ||
+    (import.meta.env.DEV &&
+      /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(apiBase)));
+let client;
 
-const LOCAL_KEY = "smng_user";
-
-export const signupWithEmail = async (email, password) => {
-  const userCred = await createUserWithEmailAndPassword(auth, email, password);
-  const user = userCred.user;
-  await sendEmailVerification(user);
-  const payload = { uid: user.uid, email: user.email };
-  localStorage.setItem(LOCAL_KEY, JSON.stringify(payload));
-  return user;
-};
-
-export const loginWithEmail = async (email, password) => {
-  const userCred = await signInWithEmailAndPassword(auth, email, password);
-  const user = userCred.user;
-  const payload = { uid: user.uid, email: user.email };
-  localStorage.setItem(LOCAL_KEY, JSON.stringify(payload));
-  return user;
-};
-
-export const logout = async () => {
-  await signOut(auth);
-  localStorage.removeItem(LOCAL_KEY);
-};
-
-export const subscribeAuth = (cb) => {
-  return onAuthStateChanged(auth, (user) => {
-    if (user) {
-      localStorage.setItem(LOCAL_KEY, JSON.stringify({ uid: user.uid, email: user.email }));
-    } else {
-      localStorage.removeItem(LOCAL_KEY);
-    }
-    if (cb) cb(user);
+export function getClient() {
+  if (!configured) throw new Error("Live workspace is unavailable.");
+  client ??= Promise.all([
+    import("@firebase/app"),
+    import("@firebase/auth"),
+  ]).then(async ([appSdk, sdk]) => {
+    const auth = sdk.getAuth(appSdk.initializeApp(config));
+    await sdk.setPersistence(auth, sdk.browserSessionPersistence);
+    return { auth, sdk };
   });
-};
+  return client;
+}
 
-export const getLocalUser = () => {
+export function clearLegacyCache() {
   try {
-    const raw = localStorage.getItem(LOCAL_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch (e) {
-    return null;
+    const keys = Object.keys(window.localStorage);
+    for (const key of keys) {
+      if (
+        key === "smng_user" ||
+        key === "userMeetings" ||
+        key.startsWith("userMeetings:")
+      ) {
+        window.localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    /* Storage can be disabled in private browsing. */
   }
-};
+}
 
-// update profile:
-export const updateProfile = async (updates) => {
-  if (!auth.currentUser) throw new Error("No user is currently logged in.");
-  await firebaseUpdateProfile(auth.currentUser, updates);
-};
-
-export default auth;
+export function authMessage(code) {
+  const messages = {
+    "auth/invalid-credential": "Check your email address and password.",
+    "auth/email-already-in-use":
+      "This email already has an account. Try signing in.",
+    "auth/weak-password": "Choose a longer password.",
+    "auth/invalid-email": "Enter a valid email address.",
+    "auth/too-many-requests": "Too many attempts. Please try again later.",
+    "auth/network-request-failed":
+      "Could not connect to authentication. Check your connection.",
+  };
+  return (
+    messages[code] || "Authentication could not be completed. Try again later."
+  );
+}
