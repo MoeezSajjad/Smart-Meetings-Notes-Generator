@@ -1,116 +1,43 @@
-# AI-Powered Meeting Note Generator - Backend
+# Meeting API
 
-Node.js Express backend for processing audio and generating meeting notes using OpenAI's Whisper API and Hugging Face Transformers.
+## Local setup
 
-## Project Structure
+Use Node.js 22. In PowerShell, in the backend directory:
 
-```
-backend/
-├── src/
-│   ├── config/          # Configuration files
-│   ├── controllers/     # Route controllers
-│   ├── middlewares/     # Custom middlewares
-│   ├── routes/          # API routes
-│   ├── services/        # Business logic & API integrations
-│   └── index.js         # Main server file
-├── .env.example         # Environment variables template
-├── package.json         # Dependencies
-└── README.md           # This file
-```
-
-## Setup Instructions
-
-### 1. Install Dependencies
-
-```bash
-npm install
-```
-
-### 2. Configure Environment Variables
-
-Copy `.env.example` to `.env` and add your API keys:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your values:
-- `OPENAI_API_KEY` - Get from OpenAI platform
-- `HUGGINGFACE_API_KEY` - Get from Hugging Face
-- `PORT` - Server port (default: 5000)
-- `NODE_ENV` - development or production
-- `CORS_ORIGIN` - Frontend URL for CORS
-
-### 3. Start the Server
-
-**Development (with auto-reload):**
-```bash
-npm run dev
-```
-
-**Production:**
-```bash
+```powershell
+npm ci
+Copy-Item .env.example .env
 npm start
 ```
 
-Server will run at `http://localhost:5000`
+Create the local environment file only once. Fill in a Groq Free API key and the Firebase project ID used by the frontend, then start the server. Check http://localhost:5000/api/health. To test without provider credentials, run `npm test`. Run `npm audit` to check installed versions.
 
-## API Endpoints
+| Variable | Purpose |
+|---|---|
+| GROQ_API_KEY | Private Groq credential. Backend only. Use a Free organization. |
+| FIREBASE_PROJECT_ID | Expected token audience and issuer. The project ID also appears in the public Firebase client configuration. |
+| CORS_ORIGIN | Comma-separated exact frontend origins. For localhost, use the port Vite actually serves. Production requires HTTPS. |
+| DEMO_ALLOWED_EMAILS | Comma-separated verified Firebase account emails allowed to use live processing. Required in production. Keep the list server-side. |
+| PORT | Hosting-assigned port, locally defaults to 5000. |
+| NODE_ENV | Set to production on hosting. |
+| GROQ_TRANSCRIPTION_MODEL | Defaults to whisper-large-v3-turbo. |
+| GROQ_NOTES_MODEL | Defaults to openai/gpt-oss-20b on Groq. |
 
-### Health Check
-- `GET /api/health` - Server status
+## HTTP interface
 
-### Audio Processing (To be implemented)
-- `POST /api/audio/transcribe` - Transcribe audio using Whisper API
-- `POST /api/audio/generate-notes` - Generate notes from transcript
-- `GET /api/audio/status/:id` - Check processing status
+Requests to `/api/audio` need `Authorization: Bearer <Firebase ID token>`. Get an ID token from the signed-in Firebase browser client. Never put a token in URLs or support logs. Responses have cache control set to no-store.
 
-## Folder Details
+| Method and path | Input and response |
+|---|---|
+| GET /api/health | Public liveness check. Returns 200 and a status of ok. |
+| POST /api/audio/upload | Multipart field named audio. One WAV, MP3 or M4A file up to 25,000,000 bytes. 201 returns data.meetingId, originalFileName, uploadedAt and initial status. |
+| GET /api/audio/meetings | 200 returns an object containing a meetings array, newest first, with metadata for the current user. |
+| GET /api/audio/status/:meetingId | 200 returns metadata and data containing transcript, notes and error. An unknown or other user's meeting returns 404. |
 
-### `/config`
-Centralized configuration management for environment variables and API keys.
+The normal sequence is uploaded → processing → ready or error. On success, notes contains summary, keyPoints and actionItems. Each action has task, priority and nullable owner. An empty task list is valid. Polling clients should stop on terminal responses, sign-out, 404, route change or timeout.
 
-### `/controllers`
-Handle request/response logic and call appropriate services.
+400 means missing/invalid upload, 401 means invalid or expired login, 403 means the verified account is outside the live demo, 413 means oversized audio and 429 means the hourly upload allowance was reached. 503 can indicate temporary authentication service failure. An upstream transcription or notes failure moves the existing meeting to error.
 
-### `/services`
-Business logic layer:
-- `whisperService.js` - Whisper API integration for audio transcription
-- `huggingfaceService.js` - Hugging Face integration for NLP tasks
+## Operations and data
 
-### `/middlewares`
-Custom middlewares:
-- Error handling
-- Request logging
-- Authentication (placeholder)
-- Request validation
-
-### `/routes`
-API route definitions that use controllers.
-
-## Features Ready to Implement
-
-- ✅ Express server setup
-- ✅ CORS enabled
-- ✅ JSON body parsing
-- ✅ Environment configuration
-- ✅ Error handling middleware
-- 🔄 Whisper API integration
-- 🔄 Hugging Face Transformers integration
-- 🔄 Audio file upload handling
-- 🔄 Database integration (if needed)
-
-## Development Notes
-
-- Uses ES Modules (`"type": "module"` in package.json)
-- Nodemon for auto-reload during development
-- All services are async-ready for API calls
-
-## Next Steps
-
-1. Install dependencies: `npm install`
-2. Create `.env` file with your API keys
-3. Implement Whisper API calls in `whisperService.js`
-4. Implement Hugging Face API calls in `huggingfaceService.js`
-5. Add authentication middleware
-6. Connect frontend to backend API
+Results expire approximately an hour after their last update. The worker removes its file after processing and sweeps abandoned server-generated audio after one hour. No transcript database is used. Choose a single instance with a writable temporary directory. Health confirms process liveness only. See [deployment](../DEPLOYMENT.md) and [audit](../AUDIT.md) for limits and checks.

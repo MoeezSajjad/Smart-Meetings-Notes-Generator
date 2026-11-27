@@ -1,148 +1,108 @@
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import multer from "multer";
+import { randomUUID } from "node:crypto";
+import path from "node:path";
+import os from "node:os";
+import { mkdirSync } from "node:fs";
+import { open, readdir, stat, unlink } from "node:fs/promises";
 
-// Get __dirname equivalent in ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-// Define upload directory
-const uploadDir = path.join(__dirname, '../../uploads');
-
-// Create uploads directory if it doesn't exist
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// Configure multer storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    // Create unique filename: timestamp_originalname
-    const uniqueSuffix = Date.now() + '_' + Math.round(Math.random() * 1E9);
-    const extension = path.extname(file.originalname);
-    const basename = path.basename(file.originalname, extension);
-    cb(null, `${basename}_${uniqueSuffix}${extension}`);
-  }
-});
-
-// File filter to validate audio formats and file size
-const fileFilter = (req, file, cb) => {
-  // Allowed audio MIME types
-  const allowedMimeTypes = [
-    'audio/wav',
-    'audio/mpeg',        // mp3
-    'audio/mp3',         // mp3 (alternative)
-    'audio/x-wav',       // wav (alternative)
-    'audio/x-m4a',       // m4a
-    'audio/mp4'          // m4a (alternative)
-  ];
-
-  // Allowed file extensions
-  const allowedExtensions = ['.wav', '.mp3', '.m4a'];
-
-  // Check MIME type
-  if (!allowedMimeTypes.includes(file.mimetype)) {
-    return cb(new Error(`Invalid file format. Only WAV, MP3, and M4A files are allowed. Received: ${file.mimetype}`), false);
-  }
-
-  // Check file extension
-  const extension = path.extname(file.originalname).toLowerCase();
-  if (!allowedExtensions.includes(extension)) {
-    return cb(new Error(`Invalid file extension. Only .wav, .mp3, and .m4a are allowed. Received: ${extension}`), false);
-  }
-
-  cb(null, true);
+const dir = path.join(os.tmpdir(), "smng-audio-v2");
+mkdirSync(dir, { recursive: true, mode: 0o700 });
+const types = {
+  ".wav": ["audio/wav", "audio/x-wav", "audio/wave"],
+  ".mp3": ["audio/mpeg", "audio/mp3"],
+  ".m4a": ["audio/mp4", "audio/x-m4a", "audio/m4a"],
 };
-
-// Configure multer
-const upload = multer({
-  storage: storage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: 100 * 1024 * 1024, // 100MB limit
-  }
-});
-
-/**
- * Upload middleware for single audio file
- * Expects form field name: 'audio'
- */
-export const uploadMiddleware = (req, res, next) => {
-  const singleFileUpload = upload.single('audio');
-
-  singleFileUpload(req, res, (err) => {
-    // Handle multer errors
-    if (err instanceof multer.MulterError) {
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(413).json({
-          error: 'File too large',
-          details: `File size exceeds 100MB limit. Received: ${(err.limit / 1024 / 1024).toFixed(2)}MB`,
-          status: 413,
-          timestamp: new Date().toISOString()
-        });
-      }
-      if (err.code === 'LIMIT_PART_COUNT') {
-        return res.status(400).json({
-          error: 'Too many parts in request',
-          status: 400,
-          timestamp: new Date().toISOString()
-        });
-      }
-      return res.status(400).json({
-        error: 'Upload error',
-        details: err.message,
-        status: 400,
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // Handle custom file filter errors
-    if (err) {
-      return res.status(400).json({
-        error: 'Invalid file',
-        details: err.message,
-        status: 400,
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // Check if file was provided
-    if (!req.file) {
-      return res.status(400).json({
-        error: 'No audio file provided',
-        details: 'Please provide an audio file in the "audio" form field',
-        status: 400,
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    // File successfully uploaded, proceed to next middleware/controller
-    next();
-  });
-};
-
-/**
- * Clean up uploaded file (utility function)
- * Can be used when processing is done or if an error occurs
- */
-export const deleteUploadedFile = (filePath) => {
+export const MAX_BYTES = 25000000;
+export async function deleteUploadedFile(file) {
   try {
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-      console.log(`File deleted: ${filePath}`);
-    }
+    await unlink(file);
   } catch (error) {
-    console.error(`Error deleting file ${filePath}:`, error);
+    if (error.code !== "ENOENT")
+      console.warn("Temporary audio cleanup deferred");
   }
-};
+}
+// A crash can interrupt finally blocks. Sweep only server-generated filenames.
+export async function sweepUploads() {
+  for (const name of await readdir(dir)) {
+    if (!/^[a-f0-9-]{36}\.(wav|mp3|m4a)$/.test(name)) continue;
+    const file = path.join(dir, name);
+    try {
+      if ((await stat(file)).mtimeMs < Date.now() - 3600000)
+        await deleteUploadedFile(file);
+    } catch (error) {
+      if (error.code !== "ENOENT") console.warn("Cleanup will retry");
+    }
+  }
+}
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: dir,
+    filename: (_req, file, cb) =>
+      cb(null, randomUUID() + path.extname(file.originalname).toLowerCase()),
+  }),
+  limits: { fileSize: MAX_BYTES + 1, files: 1, fields: 0, parts: 2 },
+  fileFilter: (_req, file, cb) =>
+    types[path.extname(file.originalname).toLowerCase()]?.includes(
+      file.mimetype,
+    )
+      ? cb(null, true)
+      : cb(new Error("Invalid audio format")),
+}).single("audio");
 
-/**
- * Get upload directory path
- * Useful for other parts of the application that need to access uploaded files
- */
-export const getUploadDir = () => uploadDir;
+export function matchesContainer(header, ext) {
+  if (ext === ".wav")
+    return (
+      header.length >= 12 &&
+      header.toString("ascii", 0, 4) === "RIFF" &&
+      header.toString("ascii", 8, 12) === "WAVE"
+    );
+  if (ext === ".mp3")
+    return (
+      header.length >= 4 &&
+      (header.toString("ascii", 0, 3) === "ID3" ||
+        (header[0] === 255 && (header[1] & 224) === 224))
+    );
+  return (
+    ext === ".m4a" &&
+    header.length >= 12 &&
+    header.toString("ascii", 4, 8) === "ftyp"
+  );
+}
+export function uploadMiddleware(req, res, next) {
+  upload(req, res, async (error) => {
+    if (error || !req.file)
+      return res
+        .status(error?.code === "LIMIT_FILE_SIZE" ? 413 : 400)
+        .json({
+          error:
+            error?.code === "LIMIT_FILE_SIZE"
+              ? "Audio exceeds 25 MB"
+              : "Provide one WAV, MP3 or M4A audio file",
+        });
+    const { path: file, size } = req.file;
+    try {
+      if (size > MAX_BYTES) {
+        await deleteUploadedFile(file);
+        return res.status(413).json({ error: "Audio exceeds 25 MB" });
+      }
+      const handle = await open(file, "r");
+      const bytes = Buffer.alloc(16);
+      let length;
+      try {
+        length = (await handle.read(bytes, 0, bytes.length, 0)).bytesRead;
+      } finally {
+        await handle.close();
+      }
+      if (!matchesContainer(bytes.subarray(0, length), path.extname(file))) {
+        await deleteUploadedFile(file);
+        return res
+          .status(400)
+          .json({ error: "Audio content does not match the selected format" });
+      }
+      next();
+    } catch (failure) {
+      await deleteUploadedFile(file);
+      next(failure);
+    }
+  });
+}
